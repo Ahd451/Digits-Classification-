@@ -10,7 +10,7 @@ from sklearn.svm import SVC
 import warnings
 # Ignore the specific warning globally
 warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
-
+#-------------------------------------------------------------------------
 def FlattenImage_dataset(dataset_path):
     all_features=[]
     all_label = []
@@ -29,7 +29,7 @@ def FlattenImage_dataset(dataset_path):
                 all_features.append(image)
                 all_label.append (label)
     return np.array(all_features) , np.array(all_label)
-
+#-------------------------------------------------------------------------
 # extract all descriptors (features) of all training dataset
 train_data_set_path = 'mnist_png\\training'
 all_features_of_train , all_label_of_train = FlattenImage_dataset(train_data_set_path)
@@ -38,6 +38,7 @@ all_features_of_train , all_label_of_train = FlattenImage_dataset(train_data_set
 # extract all descriptors (features) of all testing dataset
 test_data_set_path = 'mnist_png\\testing'
 all_features_of_test , all_label_of_test = FlattenImage_dataset(test_data_set_path)
+#-------------------------------------------------------------------------
 
 clf = SVC( kernel='rbf')  #Radial Basis Function non-linear
 clf.fit(all_features_of_train, all_label_of_train)
