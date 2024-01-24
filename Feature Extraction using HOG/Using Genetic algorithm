@@ -1,0 +1,199 @@
+import numpy as np 
+import cv2
+import os
+from sklearn.metrics import accuracy_score
+from sklearn.svm import SVC
+from sklearn.feature_selection import SelectKBest, f_classif
+from skimage.feature import hog
+import warnings 
+from openpyxl import Workbook
+warnings.filterwarnings ("ignore")
+# Ignore the specific warning globally
+warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
+
+#---------------------------------------------------
+
+def HOG_for_dataset(dataset_path):
+    X = []
+    Y = []
+
+    for label ,category in enumerate(os.listdir(dataset_path)):
+
+        category_path = os.path.join(dataset_path, category)
+
+        print(category_path)
+
+        if os.path.isdir(category_path):
+
+            for image in os.listdir(category_path):
+
+                image_path = os.path.join(category_path, image)
+                image = cv2.imread(image_path , cv2.IMREAD_GRAYSCALE)
+
+                fd= hog(image, orientations=8, pixels_per_cell=(4, 4), cells_per_block=(1, 1), visualize=False)
+
+                X.append(fd)
+                Y.append(label)
+    return np.array(X) , np.array(Y)
+
+#---------------------------------------------------
+
+
+train_path = 'mnist_png\\training'
+X_train , Y_train = HOG_for_dataset(train_path)
+
+test_path = 'mnist_png\\testing'
+X_test , Y_test =  HOG_for_dataset(test_path)
+
+#---------------------------------------------------
+
+
+def InitiatePopulation (sz , chromosome_length):
+    population = []
+    min_ones = 50
+    for _ in range(sz):
+        
+        chromosome = np.zeros(chromosome_length, dtype=int) # initialize chromosome by zeros 
+        
+        ones_count = np.random.randint(min_ones, chromosome_length) 
+        # random number of ones in chromosome between
+        
+        indices= np.random.choice(chromosome_length, ones_count, replace=False) #??
+        # random indices of ones in chromosome 
+        
+        chromosome[indices] = 1
+        population.append(chromosome)
+    
+    return np.array(population)
+
+#---------------------------------------------------
+
+def calculate_fitness(chromosome):
+    selected_features = X_train[:, chromosome.astype(bool)] # select features that has 1 in chromosome 
+    
+    n_features = min ( selected_features.shape[1] , 50 )
+    # choose the minimum as after selection, crossover and mutation number
+    # of ones may be less than 10 
+    
+    selector = SelectKBest(score_func=f_classif, k= n_features ) # f1 
+    
+    selector.fit(selected_features, Y_train)
+    
+    return np.mean(selector.scores_)
+
+#---------------------------------------------------
+
+
+def selection ( fitness_scores , pop ):
+    
+    selected_parents = []
+    
+    n = len (pop)
+    
+    for _ in range(n):
+        
+        lim = int(n//2)
+        
+        idx1 = int( np.random.choice (range(lim), size=1, replace=False)) 
+        # random index in the first half of chromosome 
+        
+        idx2 = int(np.random.choice(range( lim +1 , n ), size=1, replace=False))
+        # random index in the second half of chromosome 
+        
+        # select the high fitness and add add it 
+        if fitness_scores[idx1] > fitness_scores[idx2]: 
+            selected_parents.append(pop[idx1])
+        else:
+            selected_parents.append(pop[idx2])
+            
+    return selected_parents 
+
+
+#---------------------------------------------------
+
+
+def crossover (selected_parents, chromosome_length):
+    
+    pop = []
+    for i in range(0, len (selected_parents), 2):
+        
+        p1, p2 = selected_parents[i], selected_parents[i + 1]
+        crossover_point = np.random.randint(chromosome_length) # random the point of crossover 
+        
+        ch1 = np.concatenate((p1[:crossover_point], p2[crossover_point:]))
+        
+        ch2 = np.concatenate((p2[:crossover_point], p1[crossover_point:]))
+        
+        pop.extend([ch1, ch2])
+    return pop
+
+
+#---------------------------------------------------
+
+
+def mutation(population , pm ):
+    
+    if np.random.rand() < pm:
+        
+        mutation_point = np.random.randint(len(population[0])) # random the index that will flip 
+        population[i][mutation_point] = 1- population[i][mutation_point]
+
+    return population
+
+#---------------------------------------------------
+
+
+population_size = 800
+num_generations = 15
+chromosome_length = X_train.shape[1]
+population = InitiatePopulation(population_size, chromosome_length)
+
+#---------------------------------------------------
+
+
+for generation in range(num_generations):
+    
+    print ("generation number " ,generation+1 )
+    
+    # fitness stage 
+    fitness_scores = []
+    for chromosome in population:
+        fitness_scores.append(calculate_fitness(chromosome) )
+        
+    sorted_indices = np.argsort(fitness_scores)[::-1]
+    
+    sorted_population = []
+    
+    for i in sorted_indices :
+        sorted_population.append(population[i])
+        
+    sorted_fitness_scores = np.array(fitness_scores)[sorted_indices]
+    
+    # -------------------------------------------------------
+    
+    population = selection(sorted_fitness_scores, population)
+    
+    population = crossover(population,chromosome_length )
+    
+    population = mutation(population , 0.01)
+    
+    population = np.array(population)
+
+#---------------------------------------------------
+
+
+best_chromosome = sorted_population[0] 
+
+selected_features = X_train[:, best_chromosome.astype(bool)]
+X_test_selected = X_test[:, best_chromosome.astype(bool)]
+print(selected_features.shape)
+
+#---------------------------------------------------
+
+
+clf_withGenetic = SVC( kernel='rbf')  
+clf_withGenetic.fit(selected_features, Y_train)
+
+Predictions = clf_withGenetic.predict(X_test_selected)
+accuracy_withGenetic = accuracy_score(Y_test, Predictions) * 100
+print (accuracy_withGenetic) 
