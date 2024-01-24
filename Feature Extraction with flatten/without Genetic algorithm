@@ -1,0 +1,48 @@
+#import required libraries
+import os
+import cv2
+import numpy as np
+from sklearn.metrics import accuracy_score
+
+from sklearn import svm
+from sklearn.svm import SVC
+
+import warnings
+# Ignore the specific warning globally
+warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
+
+def FlattenImage_dataset(dataset_path):
+    all_features=[]
+    all_label = []
+    for label , category in enumerate(os.listdir(dataset_path)):
+    
+        category_path = os.path.join(dataset_path, category)
+        print(category_path)
+
+        if os.path.isdir(category_path):
+            for image in os.listdir(category_path):
+
+                image_path = os.path.join(category_path, image)
+                image = cv2.imread(image_path , cv2.IMREAD_GRAYSCALE)
+                image = image.reshape(-1)
+
+                all_features.append(image)
+                all_label.append (label)
+    return np.array(all_features) , np.array(all_label)
+
+# extract all descriptors (features) of all training dataset
+train_data_set_path = 'mnist_png\\training'
+all_features_of_train , all_label_of_train = FlattenImage_dataset(train_data_set_path)
+
+
+# extract all descriptors (features) of all testing dataset
+test_data_set_path = 'mnist_png\\testing'
+all_features_of_test , all_label_of_test = FlattenImage_dataset(test_data_set_path)
+
+clf = SVC( kernel='rbf')  #Radial Basis Function non-linear
+clf.fit(all_features_of_train, all_label_of_train)
+
+Predictions = clf.predict(all_features_of_test)
+accuracy = accuracy_score(all_label_of_test, Predictions) *100
+print(accuracy) 
+
