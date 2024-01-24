@@ -1,0 +1,110 @@
+#import required libraries
+import os
+import cv2
+import numpy as np
+from sklearn.cluster import KMeans
+from sklearn.pipeline import make_pipeline
+from sklearn.metrics import accuracy_score
+from sklearn import svm
+from sklearn.preprocessing import StandardScaler
+import warnings
+# Ignore the specific warning globally
+warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
+
+#-------------------------------------------------------------------------
+
+# Function to extract SIFT features from an image
+def extract_sift_features(image):
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    sift = cv2.xfeatures2d.SIFT_create()
+    keypoints, descriptors = sift.detectAndCompute(gray, None)
+    return  keypoints, descriptors
+#-------------------------------------------------------------------------
+
+# extract all descpritors (features) of all training dataset
+
+train_data_set_path = 'mnist_png\\training'
+
+all_features_of_train=[]
+#-------------------------------------------------------------------------
+
+for category in os.listdir(train_data_set_path):
+    category_path = os.path.join(train_data_set_path, category)
+    print(category_path)
+    if os.path.isdir(category_path):
+        
+        for image in os.listdir(category_path):
+            image_path = os.path.join(category_path, image)
+            image = cv2.imread(image_path)
+            keypoints , sift_features = extract_sift_features(image)
+            
+            if sift_features is not None:
+                for sift_feature in sift_features:
+                    all_features_of_train.append(sift_feature)
+
+#-------------------------------------------------------------------------
+
+# keypoints of all dataset * 128
+all_features_of_train = np.array(all_features_of_train)
+print(all_features_of_train.shape)
+#-------------------------------------------------------------------------
+
+scaler = StandardScaler()
+scaler.fit(all_features_of_train)
+
+# Use KMeans for clustering
+n_clusters = 8
+kmeans = make_pipeline(KMeans(n_clusters=n_clusters,n_init = 10, random_state=42))
+kmeans.fit(all_features_of_train)
+
+#-------------------------------------------------------------------------
+
+def image_bow_representation(image, kmeans):
+    global scaler
+    global n_clusters
+    keypoints, descriptors = extract_sift_features(image)
+    if descriptors is not None:
+        descriptors = scaler.transform(descriptors)
+        features = kmeans.predict(descriptors)   
+        hist, _  = np.histogram(features, bins=range(n_clusters + 1))
+        return hist
+    else:
+        return np.zeros(n_clusters)
+
+#-------------------------------------------------------------------------
+
+def BOW_For_dataset(dataset_path):
+    X=[]
+    Y=[]
+    for label ,category in enumerate( os.listdir(dataset_path)):
+
+        category_path = os.path.join(dataset_path, category)
+
+        print(category_path)
+
+        if os.path.isdir(category_path):
+
+            for image in os.listdir(category_path): 
+
+                image_path = os.path.join(category_path, image)
+                image = cv2.imread(image_path)
+
+                bow_features = image_bow_representation(image, kmeans)
+
+                X.append(bow_features)
+                Y.append(label)
+    
+    return np.array(X) , np.array(Y) 
+
+#-------------------------------------------------------------------------
+
+X_train , Y_train = BOW_For_dataset('mnist_png\\training')
+X_test , Y_test = BOW_For_dataset('mnist_png\\testing')
+
+#-------------------------------------------------------------------------
+clf = svm.SVC(kernel = 'rbf')
+clf.fit(X_train, Y_train)
+Predictions = clf.predict(X_test)
+accuracy = accuracy_score(Y_test, Predictions)
+print("Accuracy:", accuracy* 100 )
+
