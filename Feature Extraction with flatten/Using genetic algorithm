@@ -58,7 +58,7 @@ def InitiatePopulation (sz, chromosome_length):
 #----------------------------------------------
 def calculate_fitness(chromosome):
     selected_features = all_features_of_train[:, chromosome.astype(bool)] # select features that has 1 in chromosome 
-    n_features = min ( selected_features.shape[1] , 50 ) # choose the minimum as after selection, crossover and mutation number of ones may be less than 10 
+    n_features = min ( selected_features.shape[1], 50 ) # choose the minimum as after selection, crossover and mutation number of ones may be less than 10 
     selector = SelectKBest(score_func=f_classif, k= n_features )
     selector.fit(selected_features, all_label_of_train)
     return np.mean(selector.scores_)
